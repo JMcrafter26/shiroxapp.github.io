@@ -1,0 +1,245 @@
+/**
+ * Scroll-driven motion, as Svelte actions.
+ *
+ * Nothing here bakes hidden state into markup: the page is prerendered, so the
+ * `rise`/`rule` classes are added at runtime. With JavaScript off, every element
+ * simply renders in its final state.
+ */
+
+const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function observe(node: Element, onEnter: (el: Element) => void) {
+	const io = new IntersectionObserver(
+		(entries) => {
+			for (const entry of entries) {
+				if (entry.isIntersecting) {
+					onEnter(entry.target);
+					io.unobserve(entry.target);
+				}
+			}
+		},
+		{ rootMargin: '0px 0px -8% 0px' }
+	);
+	io.observe(node);
+	return { destroy: () => io.disconnect() };
+}
+
+/** Fades and lifts one element in when it scrolls into view. */
+export function inView(node: HTMLElement, delay = 0) {
+	if (reduced()) return;
+	node.classList.add('rise');
+	if (delay) node.style.setProperty('--delay', `${delay}ms`);
+	return observe(node, (el) => el.classList.add('in'));
+}
+
+/** Same, but sequences the element's direct children. */
+export function inViewStagger(node: HTMLElement, step = 70) {
+	if (reduced()) return;
+	const children = [...node.children] as HTMLElement[];
+	for (const [i, child] of children.entries()) {
+		child.classList.add('rise');
+		child.style.setProperty('--delay', `${i * step}ms`);
+	}
+	return observe(node, () => children.forEach((c) => c.classList.add('in')));
+}
+
+/**
+ * Tilts an element a couple of degrees toward the pointer, and lets it drift on
+ * its own when the pointer is elsewhere. Pointer-coarse devices get the drift only.
+ */
+export function tilt(node: HTMLElement, max = 5) {
+	if (reduced()) return;
+
+	let frame = 0;
+
+	const onMove = (event: PointerEvent) => {
+		cancelAnimationFrame(frame);
+		frame = requestAnimationFrame(() => {
+			const { innerWidth, innerHeight } = window;
+			const x = (event.clientX / innerWidth - 0.5) * 2;
+			const y = (event.clientY / innerHeight - 0.5) * 2;
+			node.style.setProperty('--tilt-y', `${x * max}deg`);
+			node.style.setProperty('--tilt-x', `${-y * (max * 0.6)}deg`);
+		});
+	};
+
+	if (matchMedia('(pointer: fine)').matches) {
+		window.addEventListener('pointermove', onMove, { passive: true });
+	}
+
+	return {
+		destroy() {
+			cancelAnimationFrame(frame);
+			window.removeEventListener('pointermove', onMove);
+		}
+	};
+}
+
+/**
+ * One light over a grid of cards, rather than one inside each of them.
+ *
+ * The pointer's position goes to every child, each expressed in that child's own
+ * coordinates — so for the cards the pointer is not over, it lands outside them,
+ * and each renders only whatever part of a single bloom reaches it. The card under
+ * the cursor is brightest, its neighbours catch the edge, and the light crosses
+ * the gaps as one thing rather than stopping at a border.
+ *
+ * Offsets are measured once and re-measured on resize, so a pointer move costs one
+ * rect read rather than one per card. Fine pointers only: with no cursor to place
+ * it, --gx/--gy keep their registered 50% and each card glows in the middle
+ * instead, which is the whole of the effect where nothing points.
+ */
+export function glowField(node: HTMLElement) {
+	if (!matchMedia('(pointer: fine)').matches) return;
+
+	const cards = [...node.children] as HTMLElement[];
+	let offsets: [number, number][] = [];
+	let frame = 0;
+
+	const measure = () => {
+		const base = node.getBoundingClientRect();
+		offsets = cards.map((card) => {
+			const rect = card.getBoundingClientRect();
+			return [rect.left - base.left, rect.top - base.top];
+		});
+	};
+
+	const place = (event: PointerEvent) => {
+		const base = node.getBoundingClientRect();
+		const x = event.clientX - base.left;
+		const y = event.clientY - base.top;
+		for (const [i, card] of cards.entries()) {
+			card.style.setProperty('--gx', `${x - offsets[i][0]}px`);
+			card.style.setProperty('--gy', `${y - offsets[i][1]}px`);
+		}
+	};
+
+	/* The light has to arrive already at the pointer. It trails the cursor by
+	   design, and a trail from wherever it was last left would drag a bloom across
+	   every card in the row on the way in — so tracking is off for the one frame
+	   that places it. */
+	const onEnter = (event: PointerEvent) => {
+		measure();
+		for (const card of cards) card.style.setProperty('--glow-track', '0s');
+		place(event);
+		requestAnimationFrame(() => {
+			for (const card of cards) card.style.removeProperty('--glow-track');
+		});
+	};
+
+	const onMove = (event: PointerEvent) => {
+		cancelAnimationFrame(frame);
+		frame = requestAnimationFrame(() => place(event));
+	};
+
+	// observing fires the callback once, which is the initial measurement
+	const ro = new ResizeObserver(measure);
+	ro.observe(node);
+	node.addEventListener('pointerenter', onEnter);
+	node.addEventListener('pointermove', onMove, { passive: true });
+
+	return {
+		destroy() {
+			cancelAnimationFrame(frame);
+			ro.disconnect();
+			node.removeEventListener('pointerenter', onEnter);
+			node.removeEventListener('pointermove', onMove);
+		}
+	};
+}
+
+/**
+ * Calls back while the pointer is over the element. Attached as an action rather
+ * than inline handlers, since the element is a decorative container and giving it
+ * an interaction role to satisfy the linter would misrepresent it to assistive tech.
+ */
+export function hoverPause(node: HTMLElement, set: (hovering: boolean) => void) {
+	const enter = () => set(true);
+	const leave = () => set(false);
+
+	node.addEventListener('pointerenter', enter);
+	node.addEventListener('pointerleave', leave);
+
+	return {
+		destroy() {
+			node.removeEventListener('pointerenter', enter);
+			node.removeEventListener('pointerleave', leave);
+		}
+	};
+}
+
+/**
+ * Reports whether the element is on screen, and keeps reporting — unlike `inView`,
+ * which fires once and disconnects. Used to hold a carousel still while nobody is
+ * looking at it, so it never reflows the part of the page someone is reading.
+ */
+export function onScreen(node: HTMLElement, set: (visible: boolean) => void) {
+	const io = new IntersectionObserver(([entry]) => set(entry.isIntersecting), { threshold: 0.3 });
+	io.observe(node);
+	return { destroy: () => io.disconnect() };
+}
+
+/**
+ * Reports a horizontal drag past a threshold as +1 (swiped left, meaning "next")
+ * or -1 (swiped right). Touch and pen only: on a mouse the same gesture is a
+ * text selection, and the device already responds to the pointer by tilting.
+ */
+export function swipe(node: HTMLElement, onSwipe: (delta: 1 | -1) => void, threshold = 40) {
+	let startX = 0;
+	let tracking = false;
+
+	const down = (event: PointerEvent) => {
+		if (event.pointerType === 'mouse') return;
+		startX = event.clientX;
+		tracking = true;
+	};
+
+	const up = (event: PointerEvent) => {
+		if (!tracking) return;
+		tracking = false;
+		const dx = event.clientX - startX;
+		if (Math.abs(dx) > threshold) onSwipe(dx < 0 ? 1 : -1);
+	};
+
+	const cancel = () => (tracking = false);
+
+	node.addEventListener('pointerdown', down, { passive: true });
+	node.addEventListener('pointerup', up, { passive: true });
+	node.addEventListener('pointercancel', cancel, { passive: true });
+
+	return {
+		destroy() {
+			node.removeEventListener('pointerdown', down);
+			node.removeEventListener('pointerup', up);
+			node.removeEventListener('pointercancel', cancel);
+		}
+	};
+}
+
+/**
+ * Reports scroll progress through the document as a 0–1 value on `--progress`,
+ * for the hairline indicator under the nav.
+ */
+export function scrollProgress(node: HTMLElement) {
+	let frame = 0;
+
+	const update = () => {
+		cancelAnimationFrame(frame);
+		frame = requestAnimationFrame(() => {
+			const max = document.documentElement.scrollHeight - innerHeight;
+			node.style.setProperty('--progress', max > 0 ? `${scrollY / max}` : '0');
+		});
+	};
+
+	update();
+	addEventListener('scroll', update, { passive: true });
+	addEventListener('resize', update, { passive: true });
+
+	return {
+		destroy() {
+			cancelAnimationFrame(frame);
+			removeEventListener('scroll', update);
+			removeEventListener('resize', update);
+		}
+	};
+}
