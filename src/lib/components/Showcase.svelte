@@ -102,48 +102,53 @@
 		     it, so turning sideways for the player resizes nothing on the page. The
 		     device shrinks around its own centre; every section below stays put. -->
 		<div class="stage" use:onScreen={(seen) => (visible = seen)}>
-			<div use:inView class="float" style="perspective: 1400px;">
-				<!-- Wraps the frame exactly, so the pause covers the device and nothing
-				     of the stage's centring space around it. -->
-				<div
-					use:tilt
-					use:swipe={(delta) => go(active + delta, true)}
-					use:hoverPause={(over) => (overDevice = over)}
-					class="transition-transform duration-500 ease-out"
-					style="transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));"
-				>
-					<PhoneFrame {landscape}>
-						<!-- all seven stacked; only the active one is opaque, so the change
-						     crossfades instead of swapping a decoded image in -->
-						<div
-							id="app-screens"
-							role="tabpanel"
-							aria-labelledby="tab-{active}"
-							class="absolute inset-0"
-						>
-							{#each screens as screen, i (screen.label)}
-								<!-- The browser picks the orientation itself, so a phone never
-								     downloads the sideways capture just to discard it. -->
-								<picture>
-									{#if screen.narrowSrc}
-										<source media="(max-width: 43.999rem)" srcset={screen.narrowSrc} />
-									{/if}
-									<img
-										src={screen.src}
-										alt={screen.alt}
-										aria-hidden={active !== i}
-										loading={i === 0 ? 'eager' : 'lazy'}
-										decoding="async"
-										draggable="false"
-										class="screen"
-										style="opacity: {active === i ? 1 : 0}; transform: scale({active === i
-											? 1
-											: 1.015});"
-									/>
-								</picture>
-							{/each}
-						</div>
-					</PhoneFrame>
+			<!-- The entrance and the idle drift get an element each. Both want the
+			     `animation` property, and on one element the more specific rule would
+			     replace the other outright rather than adding to it. -->
+			<div use:inView class="reveal media" style="perspective: 1400px;">
+				<div class="float">
+					<!-- Wraps the frame exactly, so the pause covers the device and nothing
+					     of the stage's centring space around it. -->
+					<div
+						use:tilt
+						use:swipe={(delta) => go(active + delta, true)}
+						use:hoverPause={(over) => (overDevice = over)}
+						class="transition-transform duration-500 ease-out"
+						style="transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));"
+					>
+						<PhoneFrame {landscape}>
+							<!-- all seven stacked; only the active one is opaque, so the change
+							     crossfades instead of swapping a decoded image in -->
+							<div
+								id="app-screens"
+								role="tabpanel"
+								aria-labelledby="tab-{active}"
+								class="absolute inset-0"
+							>
+								{#each screens as screen, i (screen.label)}
+									<!-- The browser picks the orientation itself, so a phone never
+									     downloads the sideways capture just to discard it. -->
+									<picture>
+										{#if screen.narrowSrc}
+											<source media="(max-width: 43.999rem)" srcset={screen.narrowSrc} />
+										{/if}
+										<img
+											src={screen.src}
+											alt={screen.alt}
+											aria-hidden={active !== i}
+											loading={i === 0 ? 'eager' : 'lazy'}
+											decoding="async"
+											draggable="false"
+											class="screen"
+											style="opacity: {active === i ? 1 : 0}; transform: scale({active === i
+												? 1
+												: 1.015});"
+										/>
+									</picture>
+								{/each}
+							</div>
+						</PhoneFrame>
+					</div>
 				</div>
 			</div>
 		</div>

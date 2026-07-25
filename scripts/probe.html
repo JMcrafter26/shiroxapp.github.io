@@ -63,6 +63,12 @@ async function run() {
 	check('fallback card still transitions opacity', getComputedStyle(fb.doc.querySelector('#features .glow-field > article')).transitionProperty,
 		(v) => v.includes('opacity') && v.includes('transform'));
 
+	const device = doc.querySelector('.reveal.media');
+	check('device is scroll-linked', device && getComputedStyle(device).animationTimeline, (v) => v && v !== 'auto');
+	check('device resolves later than type', device && getComputedStyle(device).animationRange, (v) => String(v).includes('20%'));
+	check('idle drift survives on its own element', getComputedStyle(doc.querySelector('.float')).animationName, 'float');
+	check('drift and entrance are not the same element', doc.querySelectorAll('.reveal.media.float').length, '0');
+
 	await fetch('/__report', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
