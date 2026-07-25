@@ -50,6 +50,19 @@ async function run() {
 	});
 	check('fallback hides nothing already on screen', firstScreen.length, '0');
 
+	const cards = doc.querySelectorAll('#features .glow-field > article');
+	check('card uses the surface gesture', getComputedStyle(cards[0]).animationName, 'reveal-surface');
+	check('card cascade offsets differ', getComputedStyle(cards[2]).animationRangeStart,
+		(v) => v !== getComputedStyle(cards[0]).animationRangeStart);
+	check('install lead panel is a surface', getComputedStyle(doc.querySelector('#install .lead')).animationName, 'reveal-surface');
+
+	// The hover response must still compose with the entrance rather than replace it.
+	check('card hover still transitions translate', getComputedStyle(cards[0]).transitionProperty,
+		(v) => v.includes('translate') && v.includes('scale'));
+	// And the observer path must keep the opacity/transform it needs.
+	check('fallback card still transitions opacity', getComputedStyle(fb.doc.querySelector('#features .glow-field > article')).transitionProperty,
+		(v) => v.includes('opacity') && v.includes('transform'));
+
 	await fetch('/__report', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
