@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"sync:release": "bun scripts/sync-release.ts",
+		"probe": "bun scripts/probe.ts",
 		"prebuild": "bun run sync:release",
 		"build": "vite build",
 		"preview": "vite preview",

@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<body style="margin:0">
+<script>
+const checks = [];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function check(name, actual, expected) {
+	const pass = typeof expected === 'function' ? expected(actual) : String(actual) === String(expected);
+	checks.push({ name, actual: String(actual), pass });
+}
+
+/** Loads the built page in an iframe of the given size and resolves once hydrated. */
+function load(src, width = 1100, height = 800) {
+	return new Promise((resolve) => {
+		const frame = document.createElement('iframe');
+		frame.style.cssText = `width:${width}px;height:${height}px;border:0`;
+		frame.src = src;
+		frame.onload = async () => {
+			for (let i = 0; i < 100 && !frame.contentWindow.__hydrated; i++) await sleep(50);
+			resolve({ doc: frame.contentDocument, win: frame.contentWindow });
+		};
+		document.body.append(frame);
+	});
+}
+
+async function run() {
+	check('browser supports view() timelines', CSS.supports('animation-timeline', 'view()'), 'true');
+
+	// Later tasks append their checks here.
+
+	await fetch('/__report', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(checks)
+	});
+}
+
+run();
+</script>
+</body>
+</html>
