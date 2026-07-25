@@ -9,6 +9,21 @@
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
+ * Whether the element was on screen the moment hydration reached it.
+ *
+ * Such an element is left alone. The page is prerendered, so it has already been
+ * painted, in its finished state, for as long as the JavaScript took to arrive —
+ * hiding it now to reveal it a frame later is not an entrance, it is the thing
+ * blinking out and coming back, which is exactly how a fault looks. An entrance on
+ * the first screen belongs to the load animations (`.load-rise` and friends), which
+ * are CSS from the first paint and so have nothing to catch up to.
+ */
+const onFirstScreen = (el: Element) => {
+	const { top, bottom } = el.getBoundingClientRect();
+	return top < innerHeight && bottom > 0;
+};
+
+/**
  * Watches every element it is given, and reports each batch that arrives together.
  *
  * The margin holds the reveal back until the element is properly on screen rather
@@ -31,7 +46,7 @@ function observe(nodes: Element[], onEnter: (batch: HTMLElement[]) => void) {
 
 /** Fades and lifts one element in when it scrolls into view. */
 export function inView(node: HTMLElement, delay = 0) {
-	if (reduced()) return;
+	if (reduced() || onFirstScreen(node)) return;
 	node.classList.add('rise');
 	if (delay) node.style.setProperty('--delay', `${delay}ms`);
 	return observe([node], ([el]) => el.classList.add('in'));
@@ -52,7 +67,8 @@ export function inView(node: HTMLElement, delay = 0) {
  */
 export function inViewStagger(node: HTMLElement, step = 70) {
 	if (reduced()) return;
-	const children = [...node.children] as HTMLElement[];
+	const children = ([...node.children] as HTMLElement[]).filter((c) => !onFirstScreen(c));
+	if (!children.length) return;
 	for (const child of children) child.classList.add('rise');
 
 	return observe(children, (batch) => {
