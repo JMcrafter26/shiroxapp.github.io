@@ -1,0 +1,17 @@
+{
+	// Committing this file is what keeps `wrangler deploy` predictable: with no
+	// config present, wrangler auto-configures at deploy time and rewrites the
+	// package.json build script to require a generated worker-configuration.d.ts
+	// this project has no use for. There is no Worker code here — the site is
+	// fully prerendered by adapter-static and served straight from ./build.
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "shirox-web",
+	"compatibility_date": "2026-07-25",
+	"assets": {
+		"directory": "./build",
+		// Single prerendered page, so unmatched paths are genuinely absent
+		// rather than client-routed. Switch to "single-page-application" only
+		// if the site ever grows client-side routing.
+		"not_found_handling": "404-page"
+	}
+}
