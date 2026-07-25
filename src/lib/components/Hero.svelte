@@ -6,9 +6,10 @@
 	const line2 = hero.headlineAccent.split(' ');
 </script>
 
-<!-- Top padding clears the floating dock, which is out of flow and so reserves
-     no space of its own. -->
-<section class="mx-auto max-w-5xl px-6 pt-32 pb-12 md:pt-44 md:pb-16">
+<!-- Top padding clears the dock, which is out of flow and so reserves no space of
+     its own. Below sm the dock is flush to the top edge rather than floating at
+     top-3, so it needs less clearing. -->
+<section class="mx-auto max-w-5xl px-6 pt-24 pb-12 sm:pt-32 md:pt-44 md:pb-16">
 	<ShiroMark draw class="load-rise h-12 w-12" />
 
 	<!-- Words are split so they can rise in one after another. The `{' '}` between

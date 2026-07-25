@@ -24,6 +24,17 @@ function load(src, width = 1100, height = 800) {
 	});
 }
 
+/** Visibility that tolerates the element not existing yet, so a missing selector
+    fails its own check instead of throwing the run away.
+
+    Asks the cascade rather than reading `offsetParent`, which is null for any
+    `position: fixed` element whether it is displayed or not — the hairline is fixed,
+    so offsetParent would call it hidden at every width. */
+const shown = (frame, selector) => {
+	const el = frame.doc.querySelector(selector);
+	return el ? frame.win.getComputedStyle(el).display !== 'none' : 'missing';
+};
+
 async function run() {
 	check('browser supports view() timelines', CSS.supports('animation-timeline', 'view()'), 'true');
 
@@ -75,14 +86,41 @@ async function run() {
 		(v) => v !== getComputedStyle(doc.querySelector('#features-heading span')).animationRangeStart);
 	check('install sub-paragraph reveals', getComputedStyle(doc.querySelector('#install > p')).animationName, 'reveal-type');
 
-	await fetch('/__report', {
+	const narrow = await load('/index.html', 390, 844);
+	const bar = narrow.doc.querySelector('header > div');
+	const barStyle = narrow.win.getComputedStyle(bar);
+	const barBox = bar.getBoundingClientRect();
+
+	check('dock spans the viewport below sm', Math.round(barBox.width), '390');
+	check('dock sits flush to the top', Math.round(barBox.top), (v) => Number(v) < 4);
+	check('dock has no pill radius below sm', barStyle.borderTopLeftRadius, '0px');
+	check('dock clears the status bar', barStyle.paddingTop, (v) => parseFloat(v) >= 8);
+	check('dividers are gone below sm', [...bar.querySelectorAll(':scope > span[aria-hidden]')].filter((s) => s.offsetParent !== null).length, '0');
+	check('progress hairline hidden below sm', shown(narrow, '.progress'), 'false');
+
+	const wide = await load('/index.html', 1100, 800);
+	const pill = wide.doc.querySelector('header > div');
+	check('desktop dock is still a pill', wide.win.getComputedStyle(pill).borderTopLeftRadius, (v) => parseFloat(v) > 10);
+	check('desktop dock is not full width', Math.round(pill.getBoundingClientRect().width), (v) => Number(v) < 1000);
+	check('progress hairline returns at sm and up', shown(wide, '.progress'), 'true');
+
+	await report();
+}
+
+function report() {
+	return fetch('/__report', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify(checks)
 	});
 }
 
-run();
+/* A check that throws must not take the run with it: an unreported probe looks
+   identical to a hung browser, and says nothing about which check broke. */
+run().catch((error) => {
+	check(`probe threw: ${error && error.message}`, error && error.stack, () => false);
+	report();
+});
 </script>
 </body>
 </html>
