@@ -69,6 +69,12 @@ async function run() {
 	check('idle drift survives on its own element', getComputedStyle(doc.querySelector('.float')).animationName, 'float');
 	check('drift and entrance are not the same element', doc.querySelectorAll('.reveal.media.float').length, '0');
 
+	const sub = doc.querySelector('#features > p');
+	check('features sub-paragraph reveals', getComputedStyle(sub).animationName, 'reveal-type');
+	check('sub-paragraph trails its heading', getComputedStyle(sub).animationRangeStart,
+		(v) => v !== getComputedStyle(doc.querySelector('#features-heading span')).animationRangeStart);
+	check('install sub-paragraph reveals', getComputedStyle(doc.querySelector('#install > p')).animationName, 'reveal-type');
+
 	await fetch('/__report', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },

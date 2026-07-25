@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { installMethods, sections } from '$lib/content';
-	import { glowField, inViewStagger } from '$lib/motion';
+	import { glowField, inView, inViewStagger } from '$lib/motion';
 	import CopyField from './CopyField.svelte';
 	import RevealHeading from './RevealHeading.svelte';
 
@@ -20,7 +20,11 @@
 		class="display text-[clamp(2.25rem,5.4vw,3.5rem)]"
 	/>
 
-	<p class="mt-5 max-w-[38ch] text-[1.0625rem]" style="color: var(--muted); text-wrap: pretty;">
+	<p
+		use:inView={70}
+		class="reveal mt-5 max-w-[38ch] text-[1.0625rem]"
+		style="--i: 1; color: var(--muted); text-wrap: pretty;"
+	>
 		{sections.install.sub}
 	</p>
 
