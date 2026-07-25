@@ -9,6 +9,19 @@
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
+ * Whether the browser drives entrances from the scroll position itself, in which
+ * case the actions in this file have nothing to do: the reveal is declared in the
+ * markup and runs from CSS, with no JavaScript involved at all.
+ *
+ * `?nolinked` forces the observer path. Browsers without `view()` — Firefox, and
+ * every iOS below 26 — are a real share of this site's visitors rather than a
+ * rounding error, so that path has to stay testable on a machine whose only browser
+ * supports the feature.
+ */
+const scrollLinked = () =>
+	!location.search.includes('nolinked') && CSS.supports('animation-timeline', 'view()');
+
+/**
  * Whether the element was on screen the moment hydration reached it.
  *
  * Such an element is left alone. The page is prerendered, so it has already been
@@ -46,7 +59,7 @@ function observe(nodes: Element[], onEnter: (batch: HTMLElement[]) => void) {
 
 /** Fades and lifts one element in when it scrolls into view. */
 export function inView(node: HTMLElement, delay = 0) {
-	if (reduced() || onFirstScreen(node)) return;
+	if (reduced() || scrollLinked() || onFirstScreen(node)) return;
 	node.classList.add('rise');
 	if (delay) node.style.setProperty('--delay', `${delay}ms`);
 	return observe([node], ([el]) => el.classList.add('in'));
@@ -66,7 +79,7 @@ export function inView(node: HTMLElement, delay = 0) {
  * counted from siblings that came in several screens ago.
  */
 export function inViewStagger(node: HTMLElement, step = 70) {
-	if (reduced()) return;
+	if (reduced() || scrollLinked()) return;
 	const children = ([...node.children] as HTMLElement[]).filter((c) => !onFirstScreen(c));
 	if (!children.length) return;
 	for (const child of children) child.classList.add('rise');
