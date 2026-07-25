@@ -296,13 +296,18 @@ button:disabled,
 .load-stroke > *:nth-child(5) { animation-delay: 260ms; }
 .load-stroke > *:nth-child(6) { animation-delay: 320ms; }
 
+/* The same trap `.press` carries, and for the same reason: Svelte scopes a
+   component's rules to `.x.svelte-hash`, which outranks this one, and a transition
+   list replaces the list it outranks rather than adding to it. A component that
+   gives a revealed element a `transition` of its own must therefore name `opacity`
+   and `transform` in it — carrying `var(--delay)` through, since the shorthand
+   resets the delay too — or the element snaps in with no fade and no stagger. */
 .rise {
 	opacity: 0;
 	transform: translateY(0.7rem);
 	transition:
-		opacity 0.75s var(--ease),
-		transform 0.75s var(--ease);
-	transition-delay: var(--delay, 0ms);
+		opacity 0.75s var(--ease) var(--delay, 0ms),
+		transform 0.75s var(--ease) var(--delay, 0ms);
 }
 
 .rise.in {
@@ -310,13 +315,18 @@ button:disabled,
 	transform: none;
 }
 
-/* slow idle drift, so the device never sits perfectly still */
+/* Slow idle drift, so the device never sits perfectly still.
+
+   `translate` rather than `transform`, for the reason `.press` and the cards use it:
+   the device is also a `.rise`, and an animation outranks every normal declaration —
+   a `transform` here would mask the reveal's own outright, leaving the device to fade
+   in where everything around it lifts. On its own property it composes instead. */
 @keyframes float {
 	from {
-		transform: translateY(-0.4rem);
+		translate: 0 -0.4rem;
 	}
 	to {
-		transform: translateY(0.4rem);
+		translate: 0 0.4rem;
 	}
 }
 

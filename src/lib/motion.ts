@@ -8,19 +8,24 @@
 
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function observe(node: Element, onEnter: (el: Element) => void) {
+/**
+ * Watches every element it is given, and reports each batch that arrives together.
+ *
+ * The margin holds the reveal back until the element is properly on screen rather
+ * than grazing the bottom edge: at 0 an element plays its entrance in the sliver
+ * below the fold, and is already finished by the time it has been scrolled to.
+ */
+function observe(nodes: Element[], onEnter: (batch: HTMLElement[]) => void) {
 	const io = new IntersectionObserver(
 		(entries) => {
-			for (const entry of entries) {
-				if (entry.isIntersecting) {
-					onEnter(entry.target);
-					io.unobserve(entry.target);
-				}
-			}
+			const arriving = entries.filter((e) => e.isIntersecting).map((e) => e.target as HTMLElement);
+			if (!arriving.length) return;
+			for (const el of arriving) io.unobserve(el);
+			onEnter(arriving);
 		},
-		{ rootMargin: '0px 0px -8% 0px' }
+		{ rootMargin: '0px 0px -12% 0px' }
 	);
-	io.observe(node);
+	for (const node of nodes) io.observe(node);
 	return { destroy: () => io.disconnect() };
 }
 
@@ -29,18 +34,35 @@ export function inView(node: HTMLElement, delay = 0) {
 	if (reduced()) return;
 	node.classList.add('rise');
 	if (delay) node.style.setProperty('--delay', `${delay}ms`);
-	return observe(node, (el) => el.classList.add('in'));
+	return observe([node], ([el]) => el.classList.add('in'));
 }
 
-/** Same, but sequences the element's direct children. */
+/**
+ * Same, but sequences the element's direct children.
+ *
+ * The children are watched one by one, not the parent: a grid taller than the
+ * viewport would otherwise reveal every row the moment its top edge appeared, and
+ * the lower rows would be sitting in their finished state before they were ever
+ * scrolled to.
+ *
+ * Which makes the stagger a property of each arrival rather than of the list. What
+ * crosses together — a row of cards, the words of a heading — cascades in document
+ * order; what arrives alone starts immediately, instead of waiting out a delay
+ * counted from siblings that came in several screens ago.
+ */
 export function inViewStagger(node: HTMLElement, step = 70) {
 	if (reduced()) return;
 	const children = [...node.children] as HTMLElement[];
-	for (const [i, child] of children.entries()) {
-		child.classList.add('rise');
-		child.style.setProperty('--delay', `${i * step}ms`);
-	}
-	return observe(node, () => children.forEach((c) => c.classList.add('in')));
+	for (const child of children) child.classList.add('rise');
+
+	return observe(children, (batch) => {
+		// the entry order is the observer's, which is not specified to be the DOM's
+		batch.sort((a, b) => children.indexOf(a) - children.indexOf(b));
+		for (const [i, child] of batch.entries()) {
+			child.style.setProperty('--delay', `${i * step}ms`);
+			child.classList.add('in');
+		}
+	});
 }
 
 /**

@@ -43,11 +43,19 @@
 <style>
 	/* `translate` and `scale` rather than one `transform`, so the hover composes with
 	   the `transform` the reveal stagger puts on these same cards instead of fighting
-	   it — the same reason `.press` is written that way. */
+	   it — the same reason `.press` is written that way.
+
+	   `opacity` and `transform` are the reveal's own, restated here because they have
+	   to be: this rule is scoped to `.card.svelte-hash`, which outranks `.rise`, and a
+	   transition list replaces the list it outranks rather than adding to it. Without
+	   them — and without `--delay`, which the shorthand resets too — the cards cut
+	   straight to their finished state, all at once. */
 	.card {
 		border: 1px solid var(--rule);
 		background: var(--sunken);
 		transition:
+			opacity 0.75s var(--ease) var(--delay, 0ms),
+			transform 0.75s var(--ease) var(--delay, 0ms),
 			translate 0.5s var(--ease-hover),
 			scale 0.5s var(--ease-hover),
 			border-color 0.5s var(--ease-hover);
