@@ -1,0 +1,67 @@
+# Publishes the prerendered site to GitHub Pages.
+#
+# The site is served from the root of shiroxapp.github.io, so `kit.paths.base`
+# stays empty and this build is byte-identical to the one Cloudflare serves. If
+# the site ever moves to a subpath, set the base path in vite.config.ts — and note
+# that the two hosts can then no longer share one build.
+#
+# `bun run build` runs `prebuild`, which pulls release facts from the AltStore
+# manifest. That fetch needs no credentials, and on failure it keeps the committed
+# values and exits 0 rather than failing the deploy.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; queue instead of cancelling, so a push that lands
+# during a deploy still ends up published rather than silently dropped.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run check
+
+      - run: bun run build
+
+      # Pages runs Jekyll over the artifact unless told not to, and Jekyll skips
+      # every underscore-prefixed directory — which would drop _app entirely and
+      # serve the page with no CSS and no JavaScript. static/.nojekyll is copied
+      # into build/ by adapter-static; this fails the run if it ever goes missing,
+      # because the resulting site looks broken rather than absent.
+      - name: Verify .nojekyll survived the build
+        run: test -f build/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
