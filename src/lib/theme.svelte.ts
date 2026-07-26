@@ -1,10 +1,10 @@
 /**
  * Theme state, owned in one place.
  *
- * Light is the default everywhere; the OS preference is deliberately not
- * consulted, so the page always opens as ink on paper. A visitor's own choice is
- * remembered and re-applied by the inline script in `app.html` before first
- * paint — this module only handles changes made after the page is running.
+ * Defaults to the OS preference (prefers-color-scheme media query) if the user
+ * hasn't manually toggled the theme. A visitor's choice is remembered and
+ * re-applied by the inline script in `app.html` before first paint — this
+ * module only handles changes made after the page is running.
  */
 
 export type Theme = 'light' | 'dark';
@@ -16,6 +16,7 @@ const SURFACE: Record<Theme, string> = {
 	dark: '#0b0b0c'
 };
 
+// Initialize to 'light'; will be synced with actual value from app.html's inline script
 let current = $state<Theme>('light');
 
 function apply(next: Theme) {
